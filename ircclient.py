@@ -37,6 +37,7 @@ class IRCClient(asyncore.dispatcher):
         # build function table
         self.handlers = {
                 'PING': self.handle_ping,
+                'PRIVMSG': self.handle_privmsg,
                 '001': self.handle_001,
                 }
 
@@ -77,6 +78,14 @@ class IRCClient(asyncore.dispatcher):
     def handle_ping(self, message):
         print 'PONG %s' % ' '.join(message.parameters)
         self.buffer += 'PONG %s\r\n' % ' '.join(message.parameters)
+
+    def handle_privmsg(self, message):
+        channel = message.parameters[0]
+        privmsg = message.parameters[1]
+        print "<%s> %s" % (message.prefix, message.parameters[1])
+        if privmsg == '!credits':
+            self.buffer += 'PRIVMSG %s :I\'m a real spider! I don\'t have credits!\r\n' % channel
+
 
     def handle_001(self, message):
         for channel in settings.channels.split(','):

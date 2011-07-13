@@ -1,6 +1,6 @@
 
 hostname = 'irc.greynode.org'
-channels = '#test'
+channels = '#test,#greynode'
 port = 6667
 nick = 'varys'
 
