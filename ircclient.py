@@ -91,11 +91,7 @@ class IRCClient(asyncore.dispatcher):
 
         # URL catching
         if privmsg.find('http://') >= 0:
-            import re
-            urls = re.findall("http://[^ ]+", privmsg)
-            for url in urls:
-                new_url = self.bitly(url)
-                self.buffer += 'PRIVMSG %s :%s\r\n' % (channel, new_url)
+            self.bot_handle_url(message)
 
         # bot command processing
         if privmsg.startswith(settings.command_char):
@@ -118,26 +114,33 @@ class IRCClient(asyncore.dispatcher):
         channel = message.parameters[0]
         self.buffer += 'PRIVMSG %s :%s\r\n' % (channel, md5(' '.join(args)).hexdigest())
 
+    def bot_handle_url(self, message):
+        from re import findall 
+        channel = message.parameters[0]
+        privmsg = message.parameters[1]
+        urls = findall("http://[^ ]+", privmsg)
+        for url in urls:
+            new_url = self.bitly(url)
+            if new_url != None:
+                self.buffer += 'PRIVMSG %s :%s\r\n' % (channel, new_url)
+
     def bitly(self, long_url):
         from urllib import urlencode
-        import httplib
-        import settings
-        import json
+        from httplib import HTTPConnection
+        from json import loads
 
-        url = '/v3/shorten?'
         params = urlencode({
-            'login': 'enum',
+            'login': settings.bitly_api_login,
             'apiKey': settings.bitly_api_key,
             'longUrl': long_url
             })
 
-        req = url + params
-        conn = httplib.HTTPConnection("api.bitly.com")
-        conn.request("GET",req)
-        response = conn.getresponse()
+        conn = HTTPConnection(settings.bitly_api_host)
+        conn.request("GET", settings.bitly_api_path + params)
+        data = loads(conn.getresponse().read())
 
-        if response.status == 200:
-            return json.loads(response.read())['data']['url']
+        if data['status_code'] == 200:
+            return data['data']['url']
         else:
-            return 'not a valid URL'
+            return None 
 
