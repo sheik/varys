@@ -90,7 +90,7 @@ class IRCClient(asyncore.dispatcher):
         print "<%s> %s" % (message.prefix, message.parameters[1])
 
         # URL catching
-        if privmsg.find('http://') >= 0:
+        if privmsg.find('http://') >= 0 or privmsg.find('https://') >= 0:
             self.bot_handle_url(message)
 
         # bot command processing
@@ -118,7 +118,7 @@ class IRCClient(asyncore.dispatcher):
         from re import findall 
         channel = message.parameters[0]
         privmsg = message.parameters[1]
-        urls = findall("http://[^ ]+", privmsg)
+        urls = findall("https?://[^ ]+", privmsg)
         for url in urls:
             new_url = self.bitly(url)
             if new_url != None:
