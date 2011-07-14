@@ -89,6 +89,14 @@ class IRCClient(asyncore.dispatcher):
         privmsg = message.parameters[1]
         print "<%s> %s" % (message.prefix, message.parameters[1])
 
+        # URL catching
+        if privmsg.find('http://') >= 0:
+            import re
+            urls = re.findall("http://[^ ]+", privmsg)
+            for url in urls:
+                new_url = self.bitly(url)
+                self.buffer += 'PRIVMSG %s :%s\r\n' % (channel, new_url)
+
         # bot command processing
         if privmsg.startswith(settings.command_char):
             parts = privmsg.split(' ')
@@ -126,7 +134,10 @@ class IRCClient(asyncore.dispatcher):
         req = url + params
         conn = httplib.HTTPConnection("api.bitly.com")
         conn.request("GET",req)
-
         response = conn.getresponse()
-        return json.loads(response.read())['data']['url']
+
+        if response.status == 200:
+            return json.loads(response.read())['data']['url']
+        else:
+            return 'not a valid URL'
 
