@@ -35,10 +35,15 @@ class IRCMessage:
 class IRCClient(asyncore.dispatcher):
     def __init__(self, host, port):
         # build function table
-        self.handlers = {
+        self.irc_handlers = {
                 'PING': self.handle_ping,
                 'PRIVMSG': self.handle_privmsg,
                 '001': self.handle_001,
+                }
+
+        self.bot_handlers = {
+                'credits': self.bot_credits,
+                'md5': self.bot_md5,
                 }
 
         asyncore.dispatcher.__init__(self)
@@ -59,8 +64,8 @@ class IRCClient(asyncore.dispatcher):
             if line != '':
                 irc_message = IRCMessage(line)
                 print line
-                if irc_message.command in self.handlers:
-                    self.handlers[irc_message.command](irc_message)
+                if irc_message.command in self.irc_handlers:
+                    self.irc_handlers[irc_message.command](irc_message)
                 else:
                     self.handle_unknown(irc_message)
 
@@ -83,11 +88,45 @@ class IRCClient(asyncore.dispatcher):
         channel = message.parameters[0]
         privmsg = message.parameters[1]
         print "<%s> %s" % (message.prefix, message.parameters[1])
-        if privmsg == '!credits':
-            self.buffer += 'PRIVMSG %s :I\'m a real spider! I don\'t have credits!\r\n' % channel
 
+        # bot command processing
+        if privmsg.startswith(settings.command_char):
+            parts = privmsg.split(' ')
+            command = parts[0][1:]
+            args = parts[1:] if len(parts) > 1 else []
+            if command in self.bot_handlers:
+                self.bot_handlers[command](message, args)
 
     def handle_001(self, message):
         for channel in settings.channels.split(','):
             self.buffer += 'JOIN %s\r\n' % channel
+
+    def bot_credits(self, message, args):
+        channel = message.parameters[0]
+        self.buffer += 'PRIVMSG %s :I\'m a real spider! I don\'t have credits!\r\n' % channel
+
+    def bot_md5(self, message, args):
+        from hashlib import md5
+        channel = message.parameters[0]
+        self.buffer += 'PRIVMSG %s :%s\r\n' % (channel, md5(' '.join(args)).hexdigest())
+
+    def bitly(self, long_url):
+        from urllib import urlencode
+        import httplib
+        import settings
+        import json
+
+        url = '/v3/shorten?'
+        params = urlencode({
+            'login': 'enum',
+            'apiKey': settings.bitly_api_key,
+            'longUrl': long_url
+            })
+
+        req = url + params
+        conn = httplib.HTTPConnection("api.bitly.com")
+        conn.request("GET",req)
+
+        response = conn.getresponse()
+        return json.loads(response.read())['data']['url']
 
