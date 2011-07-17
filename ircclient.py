@@ -49,45 +49,45 @@ class IRCClient(asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((host,port))
-        self.buffer = ''
+        self.send_buffer = ''
 
     def handle_connect(self):
-        print 'Connected!'
-        self.buffer = 'USER %s %s %s :%s\r\n' % (settings.nick, settings.nick, settings.nick, settings.nick)
-        self.buffer += 'NICK %s\r\n' % settings.nick
+        print('Connected!')
+        self.send_buffer = 'USER %s %s %s :%s\r\n' % (settings.nick, settings.nick, settings.nick, settings.nick)
+        self.send_buffer += 'NICK %s\r\n' % settings.nick
 
     def handle_close(self):
         self.close()
 
     def handle_read(self):
-        for line in self.recv(1024).split("\r\n"):
-            if line != '':
-                irc_message = IRCMessage(line)
-                print line
+        for line in self.recv(1024).split(b'\r\n'):
+            if line != b'':
+                irc_message = IRCMessage(str(line, 'UTF-8'))
+                print(irc_message.message)
                 if irc_message.command in self.irc_handlers:
                     self.irc_handlers[irc_message.command](irc_message)
                 else:
                     self.handle_unknown(irc_message)
 
     def writable(self):
-        return (len(self.buffer) > 0)
+        return (len(self.send_buffer) > 0)
 
     def handle_write(self):
-        sent = self.send(self.buffer)
-        self.buffer = self.buffer[sent:]
+        sent = self.send(bytes(self.send_buffer, 'UTF-8'))
+        self.send_buffer = self.send_buffer[sent:]
 
     # IRC command handlers
     def handle_unknown(self, message):
-        print "unknown command %s" % message.command
+        print("unknown command %s" % message.command)
 
     def handle_ping(self, message):
-        print 'PONG %s' % ' '.join(message.parameters)
-        self.buffer += 'PONG %s\r\n' % ' '.join(message.parameters)
+        print('PONG %s' % ' '.join(message.parameters))
+        self.send_buffer += 'PONG %s\r\n' % ' '.join(message.parameters)
 
     def handle_privmsg(self, message):
         channel = message.parameters[0]
         privmsg = message.parameters[1]
-        print "<%s> %s" % (message.prefix, message.parameters[1])
+        print("<%s> %s" % (message.prefix, message.parameters[1]))
 
         # URL catching
         if privmsg.find('http://') >= 0 or privmsg.find('https://') >= 0:
@@ -103,16 +103,18 @@ class IRCClient(asyncore.dispatcher):
 
     def handle_001(self, message):
         for channel in settings.channels.split(','):
-            self.buffer += 'JOIN %s\r\n' % channel
+            print('Trying to join channels...')
+            self.send_buffer += 'JOIN %s\r\n' % channel
 
     def bot_credits(self, message, args):
         channel = message.parameters[0]
-        self.buffer += 'PRIVMSG %s :I\'m a real spider! I don\'t have credits!\r\n' % channel
+        print(channel)
+        self.send_buffer += 'PRIVMSG %s :I\'m a real spider! I don\'t have credits!\r\n' % channel
 
     def bot_md5(self, message, args):
         from hashlib import md5
         channel = message.parameters[0]
-        self.buffer += 'PRIVMSG %s :%s\r\n' % (channel, md5(' '.join(args)).hexdigest())
+        self.send_buffer += 'PRIVMSG %s :%s\r\n' % (channel, md5(' '.join(args).encode('UTF-8')).hexdigest())
 
     def bot_handle_url(self, message):
         from re import findall 
@@ -122,11 +124,11 @@ class IRCClient(asyncore.dispatcher):
         for url in urls:
             new_url = self.bitly(url)
             if new_url != None:
-                self.buffer += 'PRIVMSG %s :%s\r\n' % (channel, new_url)
+                self.send_buffer += 'PRIVMSG %s :%s\r\n' % (channel, new_url)
 
     def bitly(self, long_url):
-        from urllib import urlencode
-        from httplib import HTTPConnection
+        from urllib.parse import urlencode
+        from http.client import HTTPConnection
         from json import loads
 
         params = urlencode({
@@ -137,7 +139,7 @@ class IRCClient(asyncore.dispatcher):
 
         conn = HTTPConnection(settings.bitly_api_host)
         conn.request("GET", settings.bitly_api_path + params)
-        data = loads(conn.getresponse().read())
+        data = loads(str(conn.getresponse().read(), 'UTF-8'))
 
         if data['status_code'] == 200:
             return data['data']['url']

@@ -1,6 +1,6 @@
 def bitly(long_url):
-    from urllib import urlencode
-    import httplib
+    from urllib.parse import urlencode
+    import http.client
     import settings
     import json
     url = '/v3/shorten?'
@@ -11,11 +11,11 @@ def bitly(long_url):
         })
 
     req = url + params
-    conn = httplib.HTTPConnection("api.bitly.com")
+    conn = http.client.HTTPConnection("api.bitly.com")
     conn.request("GET",req)
 
     response = conn.getresponse()
     return json.loads(response.read())['data']['url']
 
 if __name__ == '__main__':
-    print bitly('http://greynode.org')
+    print(bitly('http://greynode.org'))
